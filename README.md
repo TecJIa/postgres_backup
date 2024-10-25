@@ -43,6 +43,11 @@ systemctl start postgresql
 systemctl enable postgresql
 ```
 
+![images2](./images/postgrsql_1.png)
+![images2](./images/postgrsql_2.png)
+
+
+
 ---
 **На хосте node1**
 
@@ -65,6 +70,7 @@ sudo -u postgres psql
 CREATE USER replicator WITH REPLICATION Encrypted PASSWORD 'Otus2022!';
 ```
 
+![images2](./images/postgrsql_3.png)
 
 ---
 **В файле /etc/postgresql/14/main/postgresql.conf указываем следующие параметры**
@@ -109,6 +115,9 @@ password_encryption = scram-sha-256
 ```
 
 
+![images2](./images/postgrsql_4.png)
+
+
 ---
 **Настраиваем параметры подключения в файле /etc/postgresql/14/main/pg_hba.conf** Добавляем строки в конец
 
@@ -117,6 +126,9 @@ password_encryption = scram-sha-256
 host    replication replication    192.168.57.11/32        scram-sha-256
 host    replication replication    192.168.57.12/32        scram-sha-256
 ```
+
+
+![images2](./images/postgrsql_5.png)
 
 
 ---
@@ -129,7 +141,7 @@ systemctl restart postgresql
 
 
 ---
-**ПЕРЕХОДИМ на хосте node3**
+**ПЕРЕХОДИМ на хост node3**
 
 
 **Останавливаем postgresql-server**
@@ -147,6 +159,10 @@ systemctl stop postgresql
 **команда из методички с ошибкой** "pg_basebackup -h 192.168.57.11 -U    /var/lib/postgresql/14/main/ -R -P"
 
 
+![images2](./images/postgrsql_6.png)
+
+
+
 **Верная команду вот**
 
 ```bash
@@ -156,24 +172,43 @@ su - postgres
 pg_basebackup -h 192.168.57.11 -U replication -R -P -D /var/lib/postgresql/14/main/
 ```
 
+![images2](./images/postgrsql_7.png)
+
 
 **Получаем ошибку доступа** Долго разбираемся, почему. 
 
 Пользователь кому разрешена репликация у нас replicat**ion**, мы указывали его в конфиге на node1
 
+
+![images2](./images/postgrsql_8.png)
+
+
+
 **Но** создавали мы вроде другого пользователя?...replicat**or**
+
+
+![images2](./images/postgrsql_9.png)
 
 
 ---
 **_ВЕРНЫЙ ШАГ_1**
 ---
-**Создадим другого пользователя**
+**Создадим другого пользователя** (либо можно было внести изменения в конфиг, но я решил так)
+
+
+![images2](./images/postgrsql_10.png)
 
 
 
 **Повторим попытку подклчючения** Но упираемся в другую проблему! Этот момент в методичке не описан
 
+
+![images2](./images/postgrsql_11.png)
+
+
+
 Ковырялся я с ним довольно долго, и именно тут убил node2, поэтому опишу эти попытки в самом конце работы. 
+
 
 **Сразу к верному решению**
 
@@ -184,6 +219,10 @@ pg_basebackup -h 192.168.57.11 -U replication -R -P -D /var/lib/postgresql/14/ma
 4) Даем ей права
 5) Проверяем
 6) Только теперь пробуем подключиться
+
+
+![images2](./images/postgrsql_12.png)
+
 
 
 **В файле  /etc/postgresql/14/main/postgresql.conf меняем параметр**
@@ -214,10 +253,19 @@ CREATE DATABASE otus_test;
 \l
 ```
 
+
+![images2](./images/postgrsql_13.png)
+
+
+
 ---
-**На хосте node2** также в psql также проверим список БД (команда \l), в списке БД должна появится БД otus_test_N_2
+**На хосте node2** также в psql проверим список БД (команда \l), в списке БД должна появится БД otus_test_N_2
 
 **Примечание** На скрине ниже показан вывод списка БД **ДО** создания на node1 и **ПОСЛЕ**. 
+
+
+
+![images2](./images/postgrsql_14.png)
 
 
 ---
@@ -230,384 +278,445 @@ CREATE DATABASE otus_test;
 
 
 
-
-
-
-
-
-
-
-
-```bash
-# Вот так работает
-yum install https://repo.percona.com/yum/percona-release-latest.noarch.rpm
-percona-release setup ps57
-yum install Percona-Server-server-57
-```
-
-
-![images2](./images/mysql_1.png)
-![images2](./images/mysql_2.png)
-![images2](./images/mysql_3.png)
-![images2](./images/mysql_4.png)
-
-
-**По умолчанию Percona хранит файлы в таком виде:**
-
-● Основной конфиг в /etc/my.cnf
-
-● Так же инклудится директория /etc/my.cnf.d/ - куда мы и будем складывать наши конфиги.
-
-● Дата файлы в /var/lib/mysql
+![images2](./images/postgrsql_15.png)
 
 
 ---
-**Копируем конфиги в /etc/my.cnf.d/**
-
-![images2](./images/mysql_5.png)
+- Этап 3: Настройка резервного копирования
 
 
-**Запускаем службу**
-
-```bash
-systemctl start mysql
-```
-
-![images2](./images/mysql_6.png)
-
-
-*При установке Percona автоматически генерирует пароль для пользователя root и кладет его в
-файл /var/log/mysqld.log*
-
-
-**Смотрим пароль**
-
-```bash
-cat /var/log/mysqld.log | grep 'root@localhost:' | awk '{print $11}'
-```
-
-
-**Подключаемся к mysql**
-
-
-```bash
-mysql -uroot -p'<PASS_из_предыдущей_команды>'
-```
-
-![images2](./images/mysql_7.png)
-
-
-
-
-**После подклчения меняем пароль** Кстати, тут есть требования к сложности пароля
-
-
-```bash
-ALTER USER USER() IDENTIFIED BY '<YourStrongPassword>';
-```
-
-![images2](./images/mysql_8.png)
+**Настраивать резервное копирование мы будем с помощью утилиты Barman**
 
 
 ---
-**Следует обратить внимание**, что атрибут server-id на мастер-сервере должен обязательно отличаться от server-id слейв-сервера. Проверить какая переменная установлена в текущий момент можно следующим образом:
-
-```bash
-mysql> SELECT @@server_id;
-```
-
-
-**Убеждаемся, что GTID Включен**
-
-```bash
-mysql> SHOW VARIABLES LIKE 'gtid_mode';
-```
-
-
-![images2](./images/mysql_9.png)
-
-
-
----
-**Создаем тестовую базу данных bet и загружаем в нее дамп**
-
-```bash
-CREATE DATABASE bet;
-```
-
-![images2](./images/mysql_10.png)
+**На хостах node1 и node2 необходимо установить утилиту barman-cli**
 
 
 ```bash
-mysql -uroot -p -D bet < /vagrant/bet.dmp
+apt install barman-cli
 ```
 
+![images2](./images/postgrsql_16.png)
 
-**Вот тут я долго тупил, так как не заметил, где выполняю команду** Подгрузка дампа идет с основной машины, только потом проваливаемся в нее и смотрим 
+---
+**На хосте barman**
 
 
-![images2](./images/mysql_11.png)
+**Устанавливаем пакеты barman и postgresql-client**
 
 
 ```bash
-mysql> USE bet;
-mysql> SHOW TABLES;
-```
-
-![images2](./images/mysql_12.png)
-
-
-
----
-**Создаем пользователя для репликации и даем ему права на выполнение репликации**
-
-```bash
-mysql> CREATE USER 'repl'@'%' IDENTIFIED BY '!OtusLinux2024';
-mysql> SELECT user,host FROM mysql.user where user='repl';
-# даем права
-mysql> GRANT REPLICATION SLAVE ON *.* TO 'repl'@'%' IDENTIFIED BY '!OtusLinux2024';
+apt install barman-cli barman postgresql
 ```
 
 
-![images2](./images/mysql_13.png)
+![images2](./images/postgrsql_17.png)
 
 
 
----
-**Делаем дамп базы для дальнейшего импорта на slave и игнорируем таблицы, по заданию** (команда в одну строку)
+**Переходим в пользователя barman и генерируем ssh-ключ**
 
-```bash
-mysql> mysqldump --all-databases --triggers --routines --master-data --ignore-table=bet.events_on_demand --ignore-table=bet.v_same_event -uroot -p > master.sql
-```
-
-
-![images2](./images/mysql_14.png)
-
-
-
----
-- Этап 3: Настройка Slave
-
-
-**Созданный дамп нужно закинуть с Мастера на Слэйф**
-
-Я использовал scp
-
-![images2](./images/mysql_15.png)
-
-
----
-На Slave сервере так же создаем\перекидываем конфиги в каталог /etc/my.cnf.d/
-
-
-![images2](./images/mysql_16.png)
-
-
-
----
-**В конфиге /etc/my.cnf.d/01-base.cnf поправим директиву server-id = 2**, так как они должны отличаться с мастером
-
-
-![images2](./images/mysql_17.png)
-
-
-
----
-**Аналогично как на Мастере, устанавливаем сервер, меняем пароль** На заметку, пока не стартануть, пароль не создается 
-
-
-![images2](./images/mysql_18.png)
-
-
----
-**Проверяем директиву server-id = 2**
+**Примечание** В методичке не хватает команды непосредственной генерации
 
 
 ```bash
-mysql> SELECT @@server_id;
+su barman
+cd
+ssh-keygen -t rsa -b 4096
 ```
 
 
-![images2](./images/mysql_19.png)
-
+![images2](./images/postgrsql_18.png)
 
 
 ---
-**Раскомментируем в /etc/my.cnf.d/05-binlog.cnf строки** Это нужно, чтобы указать таблицы, которые будут игнорироваться при репликации данных
+**Переходим на хост node1**. Переходим в пользователя postgres и тоже генерируем ssh-ключ
+
 
 ```bash
-#replicate-ignore-table=bet.events_on_demand
-#replicate-ignore-table=bet.v_same_event
+su postgres
+cd 
+ssh-keygen -t rsa -b 4096
 ```
 
-![images2](./images/mysql_20.png)
+
+![images2](./images/postgrsql_19.png)
+
+
+---
+**выводим содержимое файла ~/.ssh/id_rsa.pub** (всё еще на node1)
+
+
+```bash
+cat ~/.ssh/id_rsa.pub
+```
+**Копируем содержимое файла на сервер barman в файл /var/lib/barman/.ssh/authorized_keys**
 
 
 
 
 ---
-- Этап 4: Импорт дампа
+**В psql создаём пользователя barman c правами суперпользователя**
 
-**Заливаем дамп**
+**В методичке не хватает важной команды**
 
-**Примечание**. Если ошибиться с директорией, получаем ошибку 
+```bash
+# Создание пользователя (Я забыл сделать скрин, поэтому такой вывод команды на скрине)
+CREATE USER barman WITH REPLICATION Encrypted PASSWORD 'Otus2022!';
+# А вот так выдаются права суперпользователя
+ALTER ROLE barman WITH SUPERUSER CREATEROLE CREATEDB REPLICATION BYPASSRLS;
+```
+
+![images2](./images/postgrsql_20.png)
+
+
+---
+**В файл /etc/postgresql/14/main/pg_hba.conf добавляем разрешения для пользователя barman**
 
 
 ```bash
-mysql> SOURCE /mnt/master.sql
+# В конец файла добавляем строки, тут пробелы вроде не играют роли
+host    all                 barman       192.168.57.13/32        scram-sha-256
+host    replication   barman       192.168.57.13/32      scram-sha-256
+```
+
+![images2](./images/postgrsql_21.png)
+
+
+---
+**Перезапускаем службу postgresql-14**
+
+
+```bash
+systemctl restart postgresql
 ```
 
 
-![images2](./images/mysql_21.png)
 
-![images2](./images/mysql_22.png)
+**В psql создадим тестовую базу otus**
 
-![images2](./images/mysql_23.png)
+
+```bash
+CREATE DATABASE otus;
+```
+
+
+
+**В базе создаём таблицу test в базе otus:**
+
+
+```bash
+\c otus;
+CREATE TABLE test (id int, name varchar(30));
+INSERT INTO test VALUES (1, alex); 
+```
+
+**Примечание**. Я не знаю, может зависит от версии, но у меня так не работает добавление записи в таблицу. Нужны одинарные кавычки
+
+
+INSERT INTO test VALUES (1, **'alex'**); 
+
+
+![images2](./images/postgrsql_22.png)
+
+
+---
+**Топаем на хост barman**
+
+**Выводим содержимое файла ~/.ssh/id_rsa.pub**
+
+
+```bash
+cat ~/.ssh/id_rsa.pub 
+```
+
+
+**Копируем содержимое файла** на сервер postgres (node1) в файл /var/lib/postgresql/.ssh/authorized_keys
+
+
+**Находясь в пользователе barman** создаём файл ~/.pgpass со следующим содержимым
+
+
+```bash
+192.168.57.11:5432:*:barman:Otus2024!
+
+# Файл должен быть с правами 600, владелец файла barman
+```
+
+![images2](./images/postgrsql_23.png)
+
+
+
+*В данном файле указываются реквизиты доступа для postgres. Через знак двоеточия пишутся следующие параметры:*
+
+-ip-адрес
+
+-порт postgres
+
+-имя БД (* означает подключение к любой БД)
+
+-имя пользователя
+
+-пароль пользователя
 
 
 
 ---
-**Проверяем залитую базу** 
+**Проверяем, что права для пользователя barman настроены корректно**. А именно, что мы можем подключиться к postgres серверу
 
-
-```bash
-mysql> SHOW DATABASES LIKE 'bet';
-mysql> USE bet;
-mysql> SHOW TABLES;
-
-# видим что таблиц v_same_event и events_on_demand нет
-```
-
-
-![images2](./images/mysql_24.png)
-
-
----
-**Подключаемся и запускаем слэйв** 
 
 
 ```bash
-CHANGE MASTER TO MASTER_HOST = "192.168.57.10", MASTER_PORT = 3306, MASTER_USER = "repl", MASTER_PASSWORD = "!OtusLinux2024", MASTER_AUTO_POSITION = 1;
-# не забываем сменить пароль и IP адрес, если надо
+psql -h 192.168.57.11 -U barman -d postgres
+# если провалились в постгрю, и увидели postgres=#, то хорошо, все работает
+# \q чтобы выйти
 ```
 
+![images2](./images/postgrsql_24.png)
 
-![images2](./images/mysql_25.png)
+
+
+**Для проверки репликации** (просто из системы, не надо проваливаться в psql
 
 
 ```bash
-mysql> START SLAVE;
-mysql> SHOW SLAVE STATUS\G
+psql -h 192.168.57.11 -U barman -c "IDENTIFY_SYSTEM" replication=1
 ```
+
+
+![images2](./images/postgrsql_25.png)
 
 
 
 ---
-**А теперь залипаем на часа полтора, потому что ловим ошибку** (увы, форумы гугла от 2005 года не особо помогли в решении(((( )
+Создаём файл **/etc/barman.conf** со следующим содержимым
 
-![images2](./images/mysql_26.png)
-![images2](./images/mysql_27.png)
 
+**Владельцем файла должен быть пользователь barman**
+
+
+```bash
+[barman]
+#Указываем каталог, в котором будут храниться бекапы
+barman_home = /var/lib/barman
+#Указываем каталог, в котором будут храниться файлы конфигурации бекапов
+configuration_files_directory = /etc/barman.d
+#пользователь, от которого будет запускаться barman
+barman_user = barman
+#расположение файла с логами
+log_file = /var/log/barman/barman.log
+#Используемый тип сжатия
+compression = gzip
+#Используемый метод бекапа
+backup_method = rsync
+archiver = on
+retention_policy = REDUNDANCY 3
+immediate_checkpoint = true
+#Глубина архива
+last_backup_maximum_age = 4 DAYS
+minimum_redundancy = 1
+```
+
+
+
+Создаём файл **/etc/barman.d/node1.conf**  со следующим содержимым
+
+
+**Владельцем файла должен быть пользователь barman**
+
+
+```bash
+[node1]
+#Описание задания
+description = "backup node1"
+#Команда подключения к хосту node1
+ssh_command = ssh postgres@192.168.57.11 
+#Команда для подключения к postgres-серверу
+conninfo = host=192.168.57.11 user=barman port=5432 dbname=postgres
+retention_policy_mode = auto
+retention_policy = RECOVERY WINDOW OF 7 days
+wal_retention_policy = main
+streaming_archiver=on
+#Указание префикса, который будет использоваться как $PATH на хосте node1
+path_prefix = /usr/pgsql-14/bin/
+#настройки слота
+create_slot = auto
+slot_name = node1
+#Команда для потоковой передачи от postgres-сервера
+streaming_conninfo = host=192.168.57.11 user=barman 
+#Тип выполняемого бекапа
+backup_method = postgres
+archiver = off
+```
+
+
+**На этом настройка бекапа завершена. Теперь проверим работу barman**
 
 
 ---
-**Смотрим, что было сделано до этого, где что упустил**
-
-**Нашел при заливке дампа вот такое. Наверно, это что-то нехорошее :DDD**
-
-![images2](./images/mysql_28.png)
-
-
-**Гугл опять не особо помогает, либо я не там ищу где-то**
+**Для проверки**
 
 
 
 ```bash
-Пробовал пересоздать таблицу
-удалить
-залить дамп без таблицы
-
-Не помогло ничего
+barman switch-wal node1
+barman cron 
+barman check node1
 ```
 
 
-**Возникла мысль**, что, может при передачи файла с мастера на слейф - он побился?! Не, ну мало ли, виртуалки же, ресурсов не очень много. Пошел проверять элементарно размеры файла на мастере и на слэйве
+*Если во всех пунктах, кроме выделенных будет OK, значит бекап отработает корректно. Если в остальных пунктах вы видите FAILED, то бекап у вас не запустится. Требуется посмотреть в логах, в чём может быть проблема*
 
 
-![images2](./images/mysql_29.png)
+**Примечание** На скрине видно 2 ошибки при выполнении команды barman switch-wal node1. Это связано с тем, что при создании пользователя barman ему не были предоставлены права суперпользователя. После предоставления прав - все пошло нормально
 
 
-**Одинаково……** НО, почему-то мой взгляд зацепился, что пользователь файла vagrant….а я же запускаюсь как root….
 
-**Расширяем права на файл**
-
-
-![images2](./images/mysql_30.png)
-
-
-```bash
-После этого
-Подключаюсь к базе на слэйве
-Удаляю старую таблицу bet (на всякий случай)
-Создаю заново эту таблицу
-Заливаю дамп повторно
-
-Ошибку не увидел! Ура)) 
-```
-
-
-![images2](./images/mysql_31.png)
-
-
----
-**Делаем проверку**
-
-
-![images2](./images/mysql_32.png)
-
-
----
-**Второй раз** кстати подключаться к мастеру не надо
-
-
-![images2](./images/mysql_33.png)
-
-
-**Просто стартуем и проверяем**
-
-
-![images2](./images/mysql_34.png)
-![images2](./images/mysql_35.png)
-
-
-**Наконец-то, репликациā работает, gtid работает и игнорируются нужные таблички**
+![images2](./images/postgrsql_26.png)
 
 
 
 ---
-- Этап 5: Проверяем работу репликации
+**Запускаем резервную копию**
 
-**На мастере** вносим изменения в таблицу
 
 ```bash
-mysql> USE bet;
-mysql> INSERT INTO bookmaker (id,bookmaker_name) VALUES(1,'1xbet');
-mysql> SELECT * FROM bookmaker; 
+barman backup node1
 ```
 
-![images2](./images/mysql_36.png)
+
+![images2](./images/postgrsql_27.png)
 
 
-**На слэйве** просто проверяем
+---
+**Проверка восстановления из бекапов**
+
+
+**На хосте node1 в psql удаляем базы Otus**
+
 
 ```bash
-mysql> SELECT * FROM bookmaker;
+\l
+DROP DATABASE otus;
+DROP DATABASE otus_test; 
 ```
 
-![images2](./images/mysql_37.png)
+
+![images2](./images/postgrsql_28.png)
 
 
-**Видим, что на слэйве появились изменения!**. Если что, 1xbet - это не реклама ставок :D
+---
+**на хосте barman запустим восстановление** (просто из системы, не надо проваливаться в psql
+
+
+```bash
+barman list-backup node1
+barman recover node1 20241025T151040 /var/lib/postgresql/14/main/ --remote-ssh-comman "ssh postgres@192.168.57.11"
+```
+
+
+![images2](./images/postgrsql_29.png)
+
+
+**Далее на хосте node1** потребуется перезапустить postgresql-сервер и снова проверить список БД. Базы otus должны вернуться обратно
+
+
+
+![images2](./images/postgrsql_30.png)
+
+
+
+**На этом работа окончена**
+
+
+---
+**Неудачные дубли с Джеки Чаном** или как героически погибла Node2  =)
+
+
+Когда я увидел ошибку, что директория НЕ ПУСТАЯ, я конечно же решил посмотреть, что там вообще такое
+
+
+![images2](./images/postgrsql_31.png)
+![images2](./images/postgrsql_32.png)
+
+
+НУу как-то дофига всего там) 
+
+Думаю, ладно, попробую сделать бэкап в другую директорию, которую сам создам
+
+
+![images2](./images/postgrsql_33.png)
+
+
+Вроде скопировалось. Заглянем внутрь.
+
+
+![images2](./images/postgrsql_34.png)
+
+
+Тут я думаю, Хм… вероятно, в какой-то момент туда что-то все же скопировалось, но там была ошибка... А перезаписывать он не умеет, наверно. Но я же не знаю, что навернякак там было до этого)
+
+
+Но странно все таки. Потому что если сравнить с тем, что есть на ноде 1 - там тоже есть эти файлы 
+
+
+![images2](./images/postgrsql_35.png)
+
+
+Думаю, ладно, я же учусь, надо тестить :D. Поглядим, что получится, если я перекину недостающие файлы и поменяю владельца. Сравниваем содержимое
+
+
+
+![images2](./images/postgrsql_36.png)
+
+
+
++ замечаем, что  файл postgresql.auto.conf изменился
+
+
+![images2](./images/postgrsql_37.png)
+
+
+Привожу каталог main якобы к пригодному виду :D
+
+
+
+![images2](./images/postgrsql_38.png)
+
+
+
+Стартую сервис, довольно долго заводится, но завелся
+
+
+Но все тщетно, те же ошибки, ничего не заводится, репликация не удается(
+
+
+Прихожу к решению поднять другую виртуалку, потому что с этой я натворил уже всякого)
+А всего лишь надо было очистить каталог, но кто же знал) 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
